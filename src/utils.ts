@@ -1,4 +1,4 @@
-function parseCustomError(error:any, contract:any) {
+function parseCustomError(error:any, contract:any, candidates:any[]) {
     if (error?.revert) {
         return error.revert;
     }
@@ -8,7 +8,18 @@ function parseCustomError(error:any, contract:any) {
     }
     const selector = data.substring(0, 10);
     // console.log(`error selector: ${selector}`);
-    const fragment = contract.interface.fragments.find((fragment:any) => fragment.selector === selector);
+
+    //const fragment = contract.interface.fragments.find((fragment:any) => fragment.selector === selector);
+    const contractCandidates = [contract, ...candidates];
+    let fragment = null
+    let errorContract = null;
+    for (let i=0;i<contractCandidates.length;i++){
+        fragment = contractCandidates[i].interface.fragments.find((fragment:any) => fragment.selector === selector);
+        errorContract = contractCandidates[i];
+        if (fragment)
+            break;
+    }
+
     if (!fragment) {
         return {
             selector: selector,
@@ -19,12 +30,12 @@ function parseCustomError(error:any, contract:any) {
         selector: selector,
         name: fragment.name,
         signature: fragment.format(),
-        args: contract.interface.decodeErrorResult(fragment, data)
+        args: errorContract.interface.decodeErrorResult(fragment, data)
     };
 }
 
 const KEYS = ['to', 'from', 'nonce', 'gasLimit', 'gasPrice', 'maxPriorityFeePerGas', 'maxFeePerGas', 'data', 'value', 'chainId', 'type', 'accessList'];
-async function parseTxCustomError(tx:any, provider:any, contract:any) {
+async function parseTxCustomError(tx:any, provider:any, contract:any, candidates:any[]) {
     const request:any = { blockTag: tx.blockNumber };
     KEYS.forEach((key) => {
         request[key] = tx[key];
@@ -38,7 +49,7 @@ async function parseTxCustomError(tx:any, provider:any, contract:any) {
         return null;
     } catch (e) {
         console.log(e);
-        return parseCustomError(e, contract);
+        return parseCustomError(e, contract, candidates);
     }
 }
 
